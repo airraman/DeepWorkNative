@@ -8,6 +8,7 @@ import {
   ScrollView,
   FlatList,
   SafeAreaView,
+  Modal
 } from 'react-native';
 import { Plus, X, Save } from 'lucide-react-native';
 
@@ -19,7 +20,9 @@ const SettingsScreen = () => {
   ]);
   const [newActivity, setNewActivity] = useState('');
   const [selectedColor, setSelectedColor] = useState('#c8b2d6');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
   const [selectedDurations, setSelectedDurations] = useState([]);
 
   const colorPalette = [
@@ -27,7 +30,13 @@ const SettingsScreen = () => {
     '#b2d6c8', '#dbbcf1', '#bcf1db', '#f1bcdb'
   ];
 
-  const durations = [5, 10, 15, 20, 30, 45, 90];
+  const durations = [5, 10, 15, 20, 30, 45];
+
+  const showFeedback = (message) => {
+    setAlertMessage(message);
+    setShowAlert(true);
+    setTimeout(() => setShowAlert(false), 2000);
+  };
 
   const handleAddActivity = () => {
     if (newActivity.trim()) {
@@ -44,12 +53,6 @@ const SettingsScreen = () => {
     showFeedback('Activity deleted');
   };
 
-  const handleUpdateColor = (id, newColor) => {
-    setActivities(activities.map(activity => 
-      activity.id === id ? { ...activity, color: newColor } : activity
-    ));
-  };
-
   const handleDurationClick = (duration) => {
     if (selectedDurations.includes(duration)) {
       setSelectedDurations(selectedDurations.filter(d => d !== duration));
@@ -62,43 +65,16 @@ const SettingsScreen = () => {
     }
   };
 
-  const showFeedback = (message) => {
-    setShowAlert(message);
-    setTimeout(() => setShowAlert(false), 2000);
-  };
-
-  const ColorPicker = ({ value, onChange, colors = colorPalette }) => (
-    <View style={styles.colorPicker}>
-      {colors.map(color => (
-        <TouchableOpacity
-          key={color}
-          style={[
-            styles.colorOption,
-            { backgroundColor: color },
-            value === color && styles.selectedColor
-          ]}
-          onPress={() => onChange(color)}
-        />
-      ))}
-    </View>
-  );
-
   const renderActivity = ({ item }) => (
     <View style={styles.activityItem}>
       <View style={styles.activityInfo}>
         <View style={[styles.colorDot, { backgroundColor: item.color }]} />
         <Text style={styles.activityName}>{item.name}</Text>
-      </View>
-      <View style={styles.activityControls}>
-        <ColorPicker
-          value={item.color}
-          onChange={(color) => handleUpdateColor(item.id, color)}
-        />
         <TouchableOpacity
           onPress={() => handleDeleteActivity(item.id)}
           style={styles.deleteButton}
         >
-          <X size={20} color="#6b7280" />
+          <X size={16} color="#6b7280" />
         </TouchableOpacity>
       </View>
     </View>
@@ -111,7 +87,7 @@ const SettingsScreen = () => {
           <Text style={styles.title}>Settings</Text>
         </View>
 
-        {/* Add New Activity */}
+        {/* Add Activity Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add Activity</Text>
           <View style={styles.addActivityForm}>
@@ -123,12 +99,15 @@ const SettingsScreen = () => {
               maxLength={20}
             />
             <View style={styles.formControls}>
-              <ColorPicker value={selectedColor} onChange={setSelectedColor} />
+              <View style={styles.colorSelectContainer}>
+                <Text style={styles.colorSelectLabel}>Color:</Text>
+                <TouchableOpacity
+                  style={[styles.selectedColorPreview, { backgroundColor: selectedColor }]}
+                  onPress={() => setShowColorPicker(true)}
+                />
+              </View>
               <TouchableOpacity
-                style={[
-                  styles.addButton,
-                  !newActivity.trim() && styles.disabledButton
-                ]}
+                style={[styles.addButton, !newActivity.trim() && styles.disabledButton]}
                 onPress={handleAddActivity}
                 disabled={!newActivity.trim()}
               >
@@ -202,10 +181,40 @@ const SettingsScreen = () => {
           <Text style={styles.buttonText}>Update Settings</Text>
         </TouchableOpacity>
 
+        {/* Color Picker Modal */}
+        <Modal
+          visible={showColorPicker}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowColorPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowColorPicker(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Select Color</Text>
+              <View style={styles.colorGrid}>
+                {colorPalette.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[styles.colorOption, { backgroundColor: color }]}
+                    onPress={() => {
+                      setSelectedColor(color);
+                      setShowColorPicker(false);
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         {/* Alert */}
         {showAlert && (
           <View style={styles.alert}>
-            <Text style={styles.alertText}>{showAlert}</Text>
+            <Text style={styles.alertText}>{alertMessage}</Text>
           </View>
         )}
       </ScrollView>
@@ -255,25 +264,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: 'white',
     textAlign: 'center',
+    fontSize: 16,
   },
   formControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  colorPicker: {
+  colorSelectContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  colorOption: {
+  colorSelectLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  selectedColorPreview: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedColor: {
-    borderColor: '#2563eb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   addButton: {
     flexDirection: 'row',
@@ -288,27 +300,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
-  helpText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 10,
-  },
   activitiesList: {
     flexGrow: 0,
   },
   activityItem: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 15,
+    padding: 12,
     marginRight: 10,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    width: 280,
+    width: 200,
   },
   activityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   colorDot: {
     width: 24,
@@ -320,20 +326,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#1f2937',
-  },
-  activityControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flex: 1,
   },
   deleteButton: {
-    padding: 8,
+    padding: 4,
+  },
+  helpText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 10,
   },
   durationGrid: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'space-between',
   },
   durationButton: {
+    width: '48%',
     backgroundColor: '#f3f4f6',
     padding: 12,
     borderRadius: 8,
@@ -364,6 +374,39 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 300,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   alert: {
     position: 'absolute',
