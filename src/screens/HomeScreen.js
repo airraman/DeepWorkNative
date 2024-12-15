@@ -10,10 +10,14 @@ import {
   FlatList
 } from 'react-native';
 import { Clock, Music, Pencil } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const HomeScreen = () => {
+
+  const navigation = useNavigation();
+  
   const [duration, setDuration] = useState('');
   const [activity, setActivity] = useState('');
   const [musicChoice, setMusicChoice] = useState('');
@@ -24,13 +28,19 @@ const HomeScreen = () => {
     { id: 'produce-music', name: 'Produce Music', color: '#bcd2f1' }
   ];
 
-  const handleStartSession = () => {
-    console.log({
-      duration,
-      activity,
-      musicChoice
-    });
-  };
+// In HomeScreen.js
+const handleStartSession = () => {
+  console.log('Starting session with:', {
+    duration,
+    activity,
+    musicChoice
+  });
+  navigation.navigate('DeepWorkSession', {
+    duration,
+    activity,
+    musicChoice
+  });
+};
 
   const renderActivity = ({ item }) => (
     <TouchableOpacity
@@ -217,7 +227,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   durationButtonActive: {
-    backgroundColor: '#1e40af',
+    backgroundColor: '#2563eb',
   },
   durationButtonText: {
     fontSize: 14,
