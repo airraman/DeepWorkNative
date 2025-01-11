@@ -213,12 +213,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     marginTop: 4,
+    marginBotton: 5
   },
   columnContainer: {
     width: 120,
     height: SCREEN_HEIGHT * 0.6,
     backgroundColor: '#e5e7eb',
     borderRadius: 60,
+    marginTop: 8,
     overflow: 'hidden',
   },
   column: {
