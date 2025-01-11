@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   header: {
-    marginTop: 48,
+    marginTop: 40,
     alignItems: 'center',
   },
   headerTitle: {
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   sectionCompleted: {
-    borderColor: '#1e40af',
+    borderColor: '#2563eb',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.6,
   },
   activityItemSelected: {
-    borderColor: '#1e40af',
+    borderColor: '#2563eb',
     borderWidth: 2,
   },
   colorDot: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   musicButtonActive: {
-    backgroundColor: '#1e40af',
+    backgroundColor: '#2563eb',
   },
   musicButtonText: {
     fontSize: 14,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e5e7eb',
   },
   startButton: {
-    backgroundColor: '#1e40af',
+    backgroundColor: '#2563eb',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
