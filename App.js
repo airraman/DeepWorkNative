@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Home, Settings, BarChart2 } from 'lucide-react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 
 // Import screens
 import HomeScreen from './src/screens/HomeScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MetricsScreen from './src/screens/MetricsScreen';
 import DeepWorkSession from './src/screens/DeepWorkSession';
+
+// Import storage service
+import { deepWorkStore } from './src/services/deepWorkStore';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -30,7 +34,69 @@ function HomeStack() {
   );
 }
 
+// Loading screen component for initialization
+function LoadingScreen() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
+      <ActivityIndicator size="large" color="#2563eb" />
+      <Text style={{ marginTop: 12, color: '#4b5563', fontSize: 16 }}>
+        Initializing DeepWork...
+      </Text>
+    </View>
+  );
+}
+
 export default function App() {
+  // Track initialization state
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState(null);
+
+  // Initialize the storage system when the app starts
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        // First, verify storage integrity
+        const isValid = await deepWorkStore.verifyStorageIntegrity();
+        
+        if (!isValid) {
+          // If storage is corrupted, attempt repair
+          const repaired = await deepWorkStore.repairStorage();
+          if (!repaired) {
+            throw new Error('Unable to repair storage');
+          }
+        }
+        
+        // Initialize the storage system
+        const initialized = await deepWorkStore.initialize();
+        if (!initialized) {
+          throw new Error('Storage initialization failed');
+        }
+
+        // Get initial sessions to warm up the cache
+        await deepWorkStore.getSessions();
+        
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Storage initialization error:', error);
+        setInitError(error.message);
+      }
+    };
+
+    initializeStorage();
+  }, []);
+
+  // Show loading screen during initialization
+  if (!isInitialized) {
+    return <LoadingScreen />;
+  }
+
+  // If there was an initialization error, we could show an error screen
+  // or handle it in another way depending on your needs
+  if (initError) {
+    // For now, we'll continue loading the app anyway
+    console.warn('Storage initialization error:', initError);
+  }
+
   return (
     <NavigationContainer>
       <Tab.Navigator

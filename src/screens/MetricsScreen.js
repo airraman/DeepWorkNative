@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,11 @@ import {
   Dimensions,
   TouchableOpacity,
   Animated,
-  PanResponder
+  PanResponder,
+  ActivityIndicator
 } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { deepWorkStore } from '../services/deepWorkStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOX_SIZE = 24;
@@ -21,18 +24,7 @@ const MONTHS = [
   'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-const mockDeepWorkData = {
-  '2024-02-13': [
-    { activity: 'write', duration: 30 },
-    { activity: 'write', duration: 20 },
-  ],
-  '2024-02-14': [
-    { activity: 'code', duration: 30 },
-    { activity: 'write', duration: 20 },
-    { activity: 'write', duration: 30 },
-  ],
-};
-
+// Define base activity colors - these should match the display colors from settings
 const activityColors = {
   'write': '#E4D0FF',      // Purple
   'code': '#D0FFDB',       // Green
@@ -40,14 +32,59 @@ const activityColors = {
 };
 
 const MetricsScreen = () => {
+  // Date-related state
   const today = new Date();
   const currentRealMonth = today.getMonth();
   const currentRealYear = today.getFullYear();
 
+  // UI state
   const [currentMonth, setCurrentMonth] = useState(currentRealMonth);
   const [currentYear, setCurrentYear] = useState(currentRealYear);
-  const panX = useRef(new Animated.Value(0)).current;
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
+  // Data state
+  const [sessions, setSessions] = useState({});
+  const [activities, setActivities] = useState([]);
+  
+  // Animation state
+  const panX = useRef(new Animated.Value(0)).current;
+
+  // Load data when component mounts
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  // Reload data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadInitialData();
+    }, [])
+  );
+
+  // Load both sessions and activities data
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Load sessions and settings in parallel
+      const [sessionsData, settings] = await Promise.all([
+        deepWorkStore.getSessions(),
+        deepWorkStore.getSettings()
+      ]);
+
+      setSessions(sessionsData);
+      setActivities(settings.activities);
+    } catch (error) {
+      console.error('Failed to load metrics data:', error);
+      setError('Failed to load data. Pull down to refresh.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle month navigation through gestures
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -72,6 +109,7 @@ const MetricsScreen = () => {
     })
   ).current;
 
+  // Navigate between months
   const navigateMonth = (direction) => {
     let newMonth = currentMonth + direction;
     let newYear = currentYear;
@@ -94,6 +132,7 @@ const MetricsScreen = () => {
     setCurrentYear(newYear);
   };
 
+  // Get all days in the current month
   const getDaysInMonth = () => {
     const dates = [];
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -105,28 +144,36 @@ const MetricsScreen = () => {
     return dates;
   };
 
+  // Format date for display
   const formatDate = (date) => {
     return `${date.getDate()}`;
   };
 
+  // Get color for an activity, falling back to a default if not found
+  const getActivityColor = (activityId) => {
+    const activity = activities.find(a => a.id === activityId);
+    return activity?.color || activityColors[activityId] || '#gray';
+  };
+
+  // Render activity boxes for a specific date
   const renderActivityBoxes = (date) => {
     const dateString = date.toISOString().split('T')[0];
-    const sessions = mockDeepWorkData[dateString] || [];
+    const daySessions = sessions[dateString] || [];
     
     return (
       <View style={styles.boxesContainer}>
-        {sessions.map((session, index) => (
+        {daySessions.map((session, index) => (
           <View
-            key={index}
+            key={`${dateString}-${index}`}
             style={[
               styles.activityBox,
-              { backgroundColor: activityColors[session.activity] }
+              { backgroundColor: getActivityColor(session.activity) }
             ]}
           />
         ))}
-        {[...Array(MAX_BOXES_PER_ROW - sessions.length)].map((_, index) => (
+        {[...Array(MAX_BOXES_PER_ROW - daySessions.length)].map((_, index) => (
           <View
-            key={`empty-${index}`}
+            key={`empty-${dateString}-${index}`}
             style={[styles.activityBox, styles.emptyBox]}
           />
         ))}
@@ -134,6 +181,7 @@ const MetricsScreen = () => {
     );
   };
 
+  // Render month selection tabs
   const renderMonthTabs = () => {
     const visibleMonths = MONTHS.map((month, index) => {
       const isVisible = currentYear < currentRealYear || 
@@ -172,6 +220,31 @@ const MetricsScreen = () => {
     );
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#E4D0FF" />
+        <Text style={styles.loadingText}>Loading metrics...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={loadInitialData}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
@@ -197,15 +270,13 @@ const MetricsScreen = () => {
       <View style={styles.legend}>
         <Text style={styles.legendTitle}>Activities:</Text>
         <View style={styles.legendItems}>
-          {Object.entries(activityColors).map(([activity, color]) => (
-            <View key={activity} style={styles.legendItem}>
+          {activities.map((activity) => (
+            <View key={activity.id} style={styles.legendItem}>
               <View
-                style={[styles.legendBox, { backgroundColor: color }]}
+                style={[styles.legendBox, { backgroundColor: activity.color }]}
               />
               <Text style={styles.legendText}>
-                {activity.split('-').map(word => 
-                  word.charAt(0).toUpperCase() + word.slice(1)
-                ).join(' ')}
+                {activity.name}
               </Text>
             </View>
           ))}
@@ -216,6 +287,34 @@ const MetricsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  }, 
+  
   container: {
     flex: 1,
     backgroundColor: '#000000',

@@ -1,29 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  StyleSheet,  // This was missing
   TouchableOpacity,
   TextInput,
   ScrollView,
   FlatList,
   SafeAreaView,
-  Modal
+  Modal,
+  ActivityIndicator
 } from 'react-native';
 import { Plus, X, Save } from 'lucide-react-native';
+import { deepWorkStore } from '../services/deepWorkStore';
 
 const SettingsScreen = () => {
-  const [activities, setActivities] = useState([
-    { id: 'write', name: 'Write', color: '#c8b2d6' },
-    { id: 'code', name: 'Code', color: '#f1dbbc' },
-    { id: 'produce-music', name: 'Produce Music', color: '#bcd2f1' }
-  ]);
+  // Core state management
+  const [activities, setActivities] = useState([]);
   const [newActivity, setNewActivity] = useState('');
   const [selectedColor, setSelectedColor] = useState('#c8b2d6');
+  const [selectedDurations, setSelectedDurations] = useState([]);
+  
+  // UI state management
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
-  const [selectedDurations, setSelectedDurations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const colorPalette = [
     '#c8b2d6', '#f1dbbc', '#bcd2f1', '#d6b2c8', 
@@ -32,36 +35,140 @@ const SettingsScreen = () => {
 
   const durations = [5, 10, 15, 20, 30, 45];
 
+  // Load saved settings when component mounts
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setIsLoading(true);
+      const settings = await deepWorkStore.getSettings();
+      setActivities(settings.activities);
+      setSelectedDurations(settings.durations);
+    } catch (error) {
+      showFeedback('Error loading settings');
+      console.error('Failed to load settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const showFeedback = (message) => {
     setAlertMessage(message);
     setShowAlert(true);
     setTimeout(() => setShowAlert(false), 2000);
   };
 
-  const handleAddActivity = () => {
-    if (newActivity.trim()) {
+  const handleAddActivity = async () => {
+    if (!newActivity.trim()) return;
+
+    try {
+      setIsSaving(true);
       const id = newActivity.toLowerCase().replace(/\s+/g, '-');
-      setActivities([...activities, { id, name: newActivity, color: selectedColor }]);
-      setNewActivity('');
-      setSelectedColor(colorPalette[0]);
-      showFeedback('Activity added successfully!');
+      const updatedActivities = [
+        ...activities, 
+        { 
+          id, 
+          name: newActivity, 
+          color: selectedColor 
+        }
+      ];
+      
+      const success = await deepWorkStore.updateActivities(updatedActivities);
+      
+      if (success) {
+        setActivities(updatedActivities);
+        setNewActivity('');
+        setSelectedColor(colorPalette[0]);
+        showFeedback('Activity added successfully!');
+      } else {
+        throw new Error('Failed to save activity');
+      }
+    } catch (error) {
+      showFeedback('Error saving activity');
+      console.error('Failed to add activity:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteActivity = (idToDelete) => {
-    setActivities(activities.filter(activity => activity.id !== idToDelete));
-    showFeedback('Activity deleted');
+  const handleDeleteActivity = async (idToDelete) => {
+    try {
+      setIsSaving(true);
+      const updatedActivities = activities.filter(
+        activity => activity.id !== idToDelete
+      );
+      
+      const success = await deepWorkStore.updateActivities(updatedActivities);
+      
+      if (success) {
+        setActivities(updatedActivities);
+        showFeedback('Activity deleted');
+      } else {
+        throw new Error('Failed to delete activity');
+      }
+    } catch (error) {
+      showFeedback('Error deleting activity');
+      console.error('Failed to delete activity:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDurationClick = (duration) => {
-    if (selectedDurations.includes(duration)) {
-      setSelectedDurations(selectedDurations.filter(d => d !== duration));
-    } else {
-      if (selectedDurations.length === 3) {
-        setSelectedDurations([duration]);
+  const handleDurationClick = async (duration) => {
+    try {
+      setIsSaving(true);
+      let newDurations;
+      
+      if (selectedDurations.includes(duration)) {
+        newDurations = selectedDurations.filter(d => d !== duration);
       } else {
-        setSelectedDurations([...selectedDurations, duration]);
+        if (selectedDurations.length === 3) {
+          newDurations = [duration];
+        } else {
+          newDurations = [...selectedDurations, duration];
+        }
       }
+      
+      const success = await deepWorkStore.updateDurations(newDurations);
+      
+      if (success) {
+        setSelectedDurations(newDurations);
+      } else {
+        throw new Error('Failed to update durations');
+      }
+    } catch (error) {
+      showFeedback('Error updating durations');
+      console.error('Failed to update durations:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (selectedDurations.length !== 3) {
+      showFeedback('Please select exactly 3 durations');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const success = await deepWorkStore.updateSettings({
+        activities,
+        durations: selectedDurations,
+      });
+
+      if (success) {
+        showFeedback('Settings updated successfully!');
+      } else {
+        throw new Error('Failed to save settings');
+      }
+    } catch (error) {
+      showFeedback('Error saving settings');
+      console.error('Failed to save settings:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -73,12 +180,22 @@ const SettingsScreen = () => {
         <TouchableOpacity
           onPress={() => handleDeleteActivity(item.id)}
           style={styles.deleteButton}
+          disabled={isSaving}
         >
           <X size={16} color="#6b7280" />
         </TouchableOpacity>
       </View>
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>Loading settings...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -97,6 +214,7 @@ const SettingsScreen = () => {
               onChangeText={setNewActivity}
               placeholder="Activity name"
               maxLength={20}
+              editable={!isSaving}
             />
             <View style={styles.formControls}>
               <View style={styles.colorSelectContainer}>
@@ -104,15 +222,25 @@ const SettingsScreen = () => {
                 <TouchableOpacity
                   style={[styles.selectedColorPreview, { backgroundColor: selectedColor }]}
                   onPress={() => setShowColorPicker(true)}
+                  disabled={isSaving}
                 />
               </View>
               <TouchableOpacity
-                style={[styles.addButton, !newActivity.trim() && styles.disabledButton]}
+                style={[
+                  styles.addButton,
+                  (!newActivity.trim() || isSaving) && styles.disabledButton
+                ]}
                 onPress={handleAddActivity}
-                disabled={!newActivity.trim()}
+                disabled={!newActivity.trim() || isSaving}
               >
-                <Plus size={20} color="white" />
-                <Text style={styles.buttonText}>Add</Text>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Plus size={20} color="white" />
+                    <Text style={styles.buttonText}>Add</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -147,11 +275,13 @@ const SettingsScreen = () => {
                   selectedDurations.length === 3 &&
                     !selectedDurations.includes(duration) &&
                     styles.disabledDuration,
+                  isSaving && styles.disabledButton
                 ]}
                 onPress={() => handleDurationClick(duration)}
                 disabled={
-                  selectedDurations.length === 3 &&
-                  !selectedDurations.includes(duration)
+                  isSaving ||
+                  (selectedDurations.length === 3 &&
+                    !selectedDurations.includes(duration))
                 }
               >
                 <Text
@@ -172,13 +302,19 @@ const SettingsScreen = () => {
         <TouchableOpacity
           style={[
             styles.updateButton,
-            selectedDurations.length !== 3 && styles.disabledButton,
+            (selectedDurations.length !== 3 || isSaving) && styles.disabledButton,
           ]}
-          onPress={() => showFeedback('Settings updated successfully!')}
-          disabled={selectedDurations.length !== 3}
+          onPress={handleSaveSettings}
+          disabled={selectedDurations.length !== 3 || isSaving}
         >
-          <Save size={20} color="white" />
-          <Text style={styles.buttonText}>Update Settings</Text>
+          {isSaving ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Save size={20} color="white" />
+              <Text style={styles.buttonText}>Update Settings</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         {/* Color Picker Modal */}
@@ -223,6 +359,7 @@ const SettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Core container styles that provide the basic layout structure
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
@@ -230,6 +367,19 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+
+  // Loading state styles for the centered loading indicator
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+
+  // Header section styles
   header: {
     padding: 15,
     borderBottomWidth: 1,
@@ -241,6 +391,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
+
+  // Common section styles used throughout the screen
   section: {
     padding: 15,
     backgroundColor: 'white',
@@ -252,6 +404,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: '#1f2937',
   },
+
+  // Add Activity form styles
   addActivityForm: {
     width: '100%',
   },
@@ -271,6 +425,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
+  // Color selection styles
   colorSelectContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,6 +443,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+
+  // Button styles used throughout the screen
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -300,6 +458,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  // Activity list styles
   activitiesList: {
     flexGrow: 0,
   },
@@ -331,6 +494,8 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 4,
   },
+
+  // Duration selection styles
   helpText: {
     fontSize: 14,
     color: '#6b7280',
@@ -362,6 +527,8 @@ const styles = StyleSheet.create({
   disabledDuration: {
     opacity: 0.5,
   },
+
+  // Update button styles
   updateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,9 +539,8 @@ const styles = StyleSheet.create({
     margin: 15,
     gap: 8,
   },
-  disabledButton: {
-    opacity: 0.5,
-  },
+
+  // Modal styles for color picker
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -408,6 +574,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+
+  // Alert styles for feedback messages
   alert: {
     position: 'absolute',
     bottom: 20,

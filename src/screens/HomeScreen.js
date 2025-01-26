@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,41 +7,83 @@ import {
   SafeAreaView,
   Dimensions,
   ScrollView,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { Clock, Music, Pencil } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { deepWorkStore } from '../services/deepWorkStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const HomeScreen = () => {
-
   const navigation = useNavigation();
   
+  // Core state for session configuration
   const [duration, setDuration] = useState('');
   const [activity, setActivity] = useState('');
   const [musicChoice, setMusicChoice] = useState('');
+  
+  // State for managing settings loaded from deepWorkStore
+  const [availableDurations, setAvailableDurations] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const activities = [
-    { id: 'write', name: 'Write', color: '#c8b2d6' },
-    { id: 'code', name: 'Code', color: '#f1dbbc' },
-    { id: 'produce-music', name: 'Produce Music', color: '#bcd2f1' }
+  // Music options remain constant as they're not configurable in settings
+  const musicOptions = [
+    { value: 'none', label: 'No music' },
+    { value: 'white-noise', label: 'White noise' },
+    { value: 'lofi', label: 'Lo-fi' }
   ];
 
-// In HomeScreen.js
-const handleStartSession = () => {
-  console.log('Starting session with:', {
-    duration,
-    activity,
-    musicChoice
-  });
-  navigation.navigate('DeepWorkSession', {
-    duration,
-    activity,
-    musicChoice
-  });
-};
+  // Load settings when component first mounts
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
+  // Reload settings whenever the screen comes into focus
+  // This ensures we have the latest settings after changes in SettingsScreen
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSettings();
+    }, [])
+  );
+
+  // Function to load settings from deepWorkStore
+  const loadSettings = async () => {
+    try {
+      setIsLoading(true);
+      const settings = await deepWorkStore.getSettings();
+      
+      // Update local state with settings
+      setAvailableDurations(settings.durations);
+      setActivities(settings.activities);
+      
+      // Validate existing selections against new settings
+      // If a selected duration or activity is no longer available, reset it
+      if (duration && !settings.durations.includes(parseInt(duration))) {
+        setDuration('');
+      }
+      if (activity && !settings.activities.some(a => a.id === activity)) {
+        setActivity('');
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle starting a new deep work session
+  const handleStartSession = () => {
+    navigation.navigate('DeepWorkSession', {
+      duration,
+      activity,
+      musicChoice
+    });
+  };
+
+  // Render individual activity item in the horizontal list
   const renderActivity = ({ item }) => (
     <TouchableOpacity
       style={[
@@ -55,6 +97,16 @@ const handleStartSession = () => {
     </TouchableOpacity>
   );
 
+  // Show loading screen while fetching settings
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>Loading settings...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
@@ -65,26 +117,26 @@ const handleStartSession = () => {
         </View>
         <View style={styles.divider} />
 
-        {/* Duration Selection */}
+        {/* Duration Selection - Now using dynamic durations from settings */}
         <View style={[styles.section, duration && styles.sectionCompleted]}>
           <View style={styles.sectionHeader}>
             <Clock stroke="#6b7280" size={20} />
             <Text style={styles.sectionTitle}>Session Duration</Text>
           </View>
           <View style={styles.durationButtons}>
-            {['10', '20', '30'].map((time) => (
+            {availableDurations.map((time) => (
               <TouchableOpacity
                 key={time}
                 style={[
                   styles.durationButton,
-                  duration === time && styles.durationButtonActive
+                  duration === time.toString() && styles.durationButtonActive
                 ]}
-                onPress={() => setDuration(time)}
+                onPress={() => setDuration(time.toString())}
               >
                 <Text
                   style={[
                     styles.durationButtonText,
-                    duration === time && styles.durationButtonTextActive
+                    duration === time.toString() && styles.durationButtonTextActive
                   ]}
                 >
                   {time}m
@@ -94,7 +146,7 @@ const handleStartSession = () => {
           </View>
         </View>
 
-        {/* Activity Selection */}
+        {/* Activity Selection - Now using dynamic activities from settings */}
         <View style={[styles.section, activity && styles.sectionCompleted]}>
           <View style={styles.sectionHeader}>
             <Pencil stroke="#6b7280" size={20} />
@@ -117,11 +169,7 @@ const handleStartSession = () => {
             <Text style={styles.sectionTitle}>Background Music</Text>
           </View>
           <View style={styles.musicButtons}>
-            {[
-              { value: 'none', label: 'No music' },
-              { value: 'white-noise', label: 'White noise' },
-              { value: 'lofi', label: 'Lo-fi' }
-            ].map((option) => (
+            {musicOptions.map((option) => (
               <TouchableOpacity
                 key={option.value}
                 style={[
