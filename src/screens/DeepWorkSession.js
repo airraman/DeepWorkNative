@@ -10,8 +10,8 @@ import {
   BackHandler,
   ActivityIndicator
 } from 'react-native';
-
 import { deepWorkStore } from '../services/deepWorkStore';
+import SessionNotesModal from '../components/SessionNotesModal';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -34,6 +34,7 @@ const DeepWorkSession = ({ route, navigation }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
   
   // References for timing management
   const startTimeRef = useRef(Date.now());
@@ -64,54 +65,52 @@ const DeepWorkSession = ({ route, navigation }) => {
   // Handle timer completion
   const handleTimeout = async () => {
     try {
-      // Pause timer while attempting to save
       clearInterval(intervalRef.current);
       setIsPaused(true);
-      
-      // Attempt to save the session
-      const success = await handleSessionComplete();
-      
-      if (success) {
-        // If save was successful, complete the session
-        setIsCompleted(true);
-      } else {
-        // If save failed, restart timer with remaining time
-        startTimer();
-        setIsPaused(false);
-      }
+      setShowNotesModal(true);
     } catch (error) {
       console.error('Error handling timeout:', error);
-      // Restart timer on error
+      startTimer();
+      setIsPaused(false);
+    }
+  };
+
+  // Handle notes submission
+  const handleNotesSubmit = async (notes) => {
+    setShowNotesModal(false);
+    const success = await handleSessionComplete(notes);
+    
+    if (success) {
+      setIsCompleted(true);
+    } else {
       startTimer();
       setIsPaused(false);
     }
   };
   
   // Handle session completion and data saving
-  const handleSessionComplete = async () => {
-    if (isSaving) return false; // Prevent multiple save attempts
+  const handleSessionComplete = async (notes = '') => {
+    if (isSaving) return false;
     
     try {
       setIsSaving(true);
       
-      // Verify storage integrity before saving
       const storageOk = await deepWorkStore.verifyStorageIntegrity();
       if (!storageOk) {
         throw new Error('Storage integrity check failed');
       }
       
-      // Save the completed session
       const result = await deepWorkStore.addSession({
         activity,
         duration: parseInt(duration),
-        musicChoice
+        musicChoice,
+        notes
       });
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save session');
       }
       
-      // Show completion message after successful save
       Alert.alert(
         'Session Complete!',
         'Great work! Your deep work session has been recorded.',
@@ -132,7 +131,6 @@ const DeepWorkSession = ({ route, navigation }) => {
       console.error('Error completing session:', error);
       saveRetryCountRef.current += 1;
       
-      // If we haven't exceeded max retries, ask user to retry
       if (saveRetryCountRef.current < MAX_SAVE_RETRIES) {
         Alert.alert(
           'Save Error',
@@ -142,14 +140,13 @@ const DeepWorkSession = ({ route, navigation }) => {
               text: 'Retry',
               onPress: async () => {
                 setIsSaving(false);
-                return await handleSessionComplete();
+                return await handleSessionComplete(notes);
               },
             },
             {
               text: 'Cancel',
               style: 'cancel',
               onPress: () => {
-                // Reset save state on cancel
                 setIsSaving(false);
                 return false;
               },
@@ -157,7 +154,6 @@ const DeepWorkSession = ({ route, navigation }) => {
           ]
         );
       } else {
-        // If max retries exceeded, show final error
         Alert.alert(
           'Error',
           'Unable to save your session after multiple attempts. Would you like to try again later?',
@@ -212,17 +208,14 @@ const DeepWorkSession = ({ route, navigation }) => {
   
   // Initialize timer and animation
   useEffect(() => {
-    // Start the countdown and animation
     startTimer();
     
-    // Animate the progress column
     Animated.timing(animatedHeight, {
       toValue: 0,
       duration: totalDuration,
       useNativeDriver: false,
     }).start();
     
-    // Cleanup on unmount
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -289,6 +282,12 @@ const DeepWorkSession = ({ route, navigation }) => {
             </Text>
           )}
         </View>
+
+        <SessionNotesModal
+          visible={showNotesModal}
+          onSubmit={handleNotesSubmit}
+          onClose={() => handleNotesSubmit('')}
+        />
       </View>
     </SafeAreaView>
   );
@@ -298,7 +297,6 @@ const styles = StyleSheet.create({
   savingIndicator: {
     marginTop: 8,
   },
-
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
@@ -321,7 +319,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     marginTop: 4,
-    marginBotton: 5
+    marginBottom: 5
   },
   columnContainer: {
     width: 120,

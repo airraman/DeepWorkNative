@@ -52,38 +52,34 @@ export default function App() {
   const [initError, setInitError] = useState(null);
 
   // Initialize the storage system when the app starts
-  useEffect(() => {
-    const initializeStorage = async () => {
-      try {
-        // First, verify storage integrity
-        const isValid = await deepWorkStore.verifyStorageIntegrity();
-        
-        if (!isValid) {
-          // If storage is corrupted, attempt repair
-          const repaired = await deepWorkStore.repairStorage();
-          if (!repaired) {
-            throw new Error('Unable to repair storage');
-          }
-        }
-        
-        // Initialize the storage system
-        const initialized = await deepWorkStore.initialize();
-        if (!initialized) {
-          throw new Error('Storage initialization failed');
-        }
-
-        // Get initial sessions to warm up the cache
-        await deepWorkStore.getSessions();
-        
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Storage initialization error:', error);
-        setInitError(error.message);
+// Initialize the storage system when the app starts
+useEffect(() => {
+  const initializeStorage = async () => {
+    try {
+      // Initialize the storage system first
+      const initialized = await deepWorkStore.initialize();
+      if (!initialized) {
+        throw new Error('Storage initialization failed');
       }
-    };
 
-    initializeStorage();
-  }, []);
+      // Only after initialization is complete, verify and repair if needed
+      const isValid = await deepWorkStore.verifyStorageIntegrity();
+      if (!isValid) {
+        const repaired = await deepWorkStore.repairStorage();
+        if (!repaired) {
+          throw new Error('Unable to repair storage');
+        }
+      }
+      
+      setIsInitialized(true);
+    } catch (error) {
+      console.error('Storage initialization error:', error);
+      setInitError(error.message);
+    }
+  };
+
+  initializeStorage();
+}, []);
 
   // Show loading screen during initialization
   if (!isInitialized) {

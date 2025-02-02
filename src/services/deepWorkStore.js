@@ -35,6 +35,7 @@ const isValidSession = (session) => {
     typeof session.activity === 'string' &&
     typeof session.duration === 'number' &&
     typeof session.musicChoice === 'string' &&
+    (!session.notes || typeof session.notes === 'string') && // Make notes optional but must be string if present
     session.duration > 0
   );
 };
@@ -142,6 +143,33 @@ export const deepWorkStore = {
   },
 
   /**
+ * Get all stored sessions
+ * @returns {Promise<Object>} Object with dates as keys and arrays of sessions as values
+ */
+getSessions: async () => {
+  try {
+    const sessions = await AsyncStorage.getItem(STORAGE_KEY);
+    
+    if (!sessions) {
+      log('No sessions found, returning empty object');
+      return {};
+    }
+
+    const parsed = JSON.parse(sessions);
+    
+    if (!isValidStorage(parsed)) {
+      throw new Error('Invalid sessions data structure');
+    }
+
+    log('Retrieved sessions successfully');
+    return parsed;
+  } catch (error) {
+    log('Error getting sessions:', error);
+    throw error;
+  }
+},
+
+  /**
    * Update the entire settings object
    * @param {Object} newSettings - The new settings to save
    */
@@ -231,6 +259,7 @@ export const deepWorkStore = {
         activity: session.activity,
         duration: parseInt(session.duration),
         musicChoice: session.musicChoice,
+        notes: session.notes || '', // Add notes field, default to empty string if not provided
         completedAt: new Date().toISOString(),
         syncStatus: 'pending',
         metadata: {
@@ -262,55 +291,6 @@ export const deepWorkStore = {
     } catch (error) {
       log('Error saving session:', error);
       return { success: false, error: error.message };
-    }
-  },
-
-  /**
-   * Get all stored sessions
-   */
-  getSessions: async () => {
-    try {
-      const sessions = await AsyncStorage.getItem(STORAGE_KEY);
-      
-      if (!sessions) {
-        log('No sessions found, returning empty object');
-        return {};
-      }
-
-      const parsed = JSON.parse(sessions);
-      
-      if (!isValidStorage(parsed)) {
-        throw new Error('Invalid sessions data structure');
-      }
-
-      log('Retrieved sessions successfully');
-      return parsed;
-    } catch (error) {
-      log('Error getting sessions:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get sessions for a specific date range
-   * @param {string} startDate - ISO date string (YYYY-MM-DD)
-   * @param {string} endDate - ISO date string (YYYY-MM-DD)
-   */
-  getSessionsByDateRange: async (startDate, endDate) => {
-    try {
-      const sessions = await deepWorkStore.getSessions();
-      const filteredSessions = {};
-      
-      Object.entries(sessions).forEach(([date, dateSessions]) => {
-        if (date >= startDate && date <= endDate) {
-          filteredSessions[date] = dateSessions;
-        }
-      });
-      
-      return filteredSessions;
-    } catch (error) {
-      log('Error getting sessions for date range:', error);
-      return {};
     }
   },
 
@@ -482,4 +462,3 @@ export const deepWorkStore = {
   }
 };
 
-export default deepWorkStore;

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { deepWorkStore } from '../services/deepWorkStore';
+import SessionDetailsModal from '../components/SessionDetailsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOX_SIZE = 24;
@@ -42,6 +43,8 @@ const MetricsScreen = () => {
   const [currentYear, setCurrentYear] = useState(currentRealYear);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
   
   // Data state
   const [sessions, setSessions] = useState({});
@@ -83,6 +86,10 @@ const MetricsScreen = () => {
       setIsLoading(false);
     }
   };
+
+
+
+
 
   // Handle month navigation through gestures
   const panResponder = useRef(
@@ -155,7 +162,11 @@ const MetricsScreen = () => {
     return activity?.color || activityColors[activityId] || '#gray';
   };
 
-  // Render activity boxes for a specific date
+  const handleSessionPress = (session) => {
+    setSelectedSession(session);
+    setShowSessionDetails(true);
+  };
+
   const renderActivityBoxes = (date) => {
     const dateString = date.toISOString().split('T')[0];
     const daySessions = sessions[dateString] || [];
@@ -163,13 +174,17 @@ const MetricsScreen = () => {
     return (
       <View style={styles.boxesContainer}>
         {daySessions.map((session, index) => (
-          <View
+          <TouchableOpacity
             key={`${dateString}-${index}`}
-            style={[
-              styles.activityBox,
-              { backgroundColor: getActivityColor(session.activity) }
-            ]}
-          />
+            onPress={() => handleSessionPress(session)}
+          >
+            <View
+              style={[
+                styles.activityBox,
+                { backgroundColor: getActivityColor(session.activity) }
+              ]}
+            />
+          </TouchableOpacity>
         ))}
         {[...Array(MAX_BOXES_PER_ROW - daySessions.length)].map((_, index) => (
           <View
@@ -180,6 +195,7 @@ const MetricsScreen = () => {
       </View>
     );
   };
+
 
   // Render month selection tabs
   const renderMonthTabs = () => {
@@ -245,7 +261,15 @@ const MetricsScreen = () => {
     );
   }
 
-  return (
+
+
+
+
+
+
+
+
+return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.brandName}>DEEP TRACKER.io</Text>
@@ -282,6 +306,14 @@ const MetricsScreen = () => {
           ))}
         </View>
       </View>
+      <SessionDetailsModal
+        visible={showSessionDetails}
+        session={selectedSession}
+        onClose={() => {
+          setShowSessionDetails(false);
+          setSelectedSession(null);
+        }}
+      />
     </SafeAreaView>
   );
 };
