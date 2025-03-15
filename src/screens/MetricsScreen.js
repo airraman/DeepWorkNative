@@ -9,15 +9,19 @@ import {
   TouchableOpacity,
   Animated,
   PanResponder,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { deepWorkStore } from '../services/deepWorkStore';
-import SessionDetailsModal from '../components/SessionDetailsModal';
+import SessionDetailsModal from '../components/modals/SessionDetailsModal';
+import SharedHeader from '../components/SharedHeader';
+import { useTheme, THEMES } from '../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOX_SIZE = 24;
 const MAX_BOXES_PER_ROW = 10;
+const HEADER_HEIGHT = Platform.OS === 'ios' ? 60 : 50;
 
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr',
@@ -25,14 +29,10 @@ const MONTHS = [
   'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-// Define base activity colors - these should match the display colors from settings
-const activityColors = {
-  'write': '#E4D0FF',      // Purple
-  'code': '#D0FFDB',       // Green
-  'produce-music': '#FFE4D0' // Orange
-};
-
 const MetricsScreen = () => {
+  const { colors, theme } = useTheme();
+  const isDark = theme === THEMES.DARK;
+  
   // Date-related state
   const today = new Date();
   const currentRealMonth = today.getMonth();
@@ -86,10 +86,6 @@ const MetricsScreen = () => {
       setIsLoading(false);
     }
   };
-
-
-
-
 
   // Handle month navigation through gestures
   const panResponder = useRef(
@@ -159,7 +155,7 @@ const MetricsScreen = () => {
   // Get color for an activity, falling back to a default if not found
   const getActivityColor = (activityId) => {
     const activity = activities.find(a => a.id === activityId);
-    return activity?.color || activityColors[activityId] || '#gray';
+    return activity?.color || colors.border;
   };
 
   const handleSessionPress = (session) => {
@@ -196,7 +192,6 @@ const MetricsScreen = () => {
     );
   };
 
-
   // Render month selection tabs
   const renderMonthTabs = () => {
     const visibleMonths = MONTHS.map((month, index) => {
@@ -211,12 +206,12 @@ const MetricsScreen = () => {
           onPress={() => setCurrentMonth(index)}
           style={[
             styles.monthTab,
-            currentMonth === index && styles.monthTabActive
+            currentMonth === index && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
           ]}
         >
           <Text style={[
-            styles.monthTabText,
-            currentMonth === index && styles.monthTabTextActive
+            { color: colors.textSecondary },
+            currentMonth === index && { color: colors.text }
           ]}>
             {month}
           </Text>
@@ -228,7 +223,13 @@ const MetricsScreen = () => {
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        style={styles.monthTabsContainer}
+        style={[
+          styles.monthTabsContainer,
+          { 
+            borderBottomColor: colors.border,
+            borderBottomWidth: 1,
+          }
+        ]}
         contentContainerStyle={styles.monthTabsContent}
       >
         {visibleMonths}
@@ -239,73 +240,85 @@ const MetricsScreen = () => {
   // Loading state
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#E4D0FF" />
-        <Text style={styles.loadingText}>Loading metrics...</Text>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <SharedHeader title="DEEP TRACKER.io" />
+        <View style={[styles.centered, { marginTop: HEADER_HEIGHT / 2 }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading metrics...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton} 
-          onPress={loadInitialData}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <SharedHeader title="DEEP TRACKER.io" />
+        <View style={[styles.centered, { marginTop: HEADER_HEIGHT / 2 }]}>
+          <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+          <TouchableOpacity 
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={loadInitialData}
+          >
+            <Text style={[styles.retryButtonText, { color: colors.buttonText }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-
-
-
-
-
-
-
-
-return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.brandName}>DEEP TRACKER.io</Text>
-        <Text style={styles.title}>DEEP WORK SUMMARY</Text>
-      </View>
-
-      {renderMonthTabs()}
-      
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContentContainer}
-        {...panResponder.panHandlers}
-      >
-        {getDaysInMonth().map((date, index) => (
-          <View key={index} style={styles.dateRow}>
-            <Text style={styles.dateText}>{formatDate(date)}</Text>
-            {renderActivityBoxes(date)}
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.legend}>
-        <Text style={styles.legendTitle}>Activities:</Text>
-        <View style={styles.legendItems}>
-          {activities.map((activity) => (
-            <View key={activity.id} style={styles.legendItem}>
-              <View
-                style={[styles.legendBox, { backgroundColor: activity.color }]}
-              />
-              <Text style={styles.legendText}>
-                {activity.name}
-              </Text>
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.contentWrapper}>
+        <SharedHeader title="DEEP TRACKER.io" />
+        
+        <View style={styles.tabWrapper}>
+          {renderMonthTabs()}
+        </View>
+        
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContentContainer}
+          {...panResponder.panHandlers}
+        >
+          {getDaysInMonth().map((date, index) => (
+            <View key={index} style={[
+              styles.dateRow, 
+              { 
+                borderBottomWidth: 1, 
+                borderBottomColor: colors.border 
+              }
+            ]}>
+              <Text style={[styles.dateText, { color: colors.text }]}>{formatDate(date)}</Text>
+              {renderActivityBoxes(date)}
             </View>
           ))}
+        </ScrollView>
+
+        <View style={[
+          styles.legend, 
+          { 
+            borderTopWidth: 1, 
+            borderTopColor: colors.border 
+          }
+        ]}>
+          <Text style={[styles.legendTitle, { color: colors.text }]}>Activities:</Text>
+          <View style={styles.legendItems}>
+            {activities.map((activity) => (
+              <View key={activity.id} style={styles.legendItem}>
+                <View
+                  style={[styles.legendBox, { backgroundColor: activity.color }]}
+                />
+                <Text style={[styles.legendText, { color: colors.text }]}>
+                  {activity.name}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
+
       <SessionDetailsModal
         visible={showSessionDetails}
         session={selectedSession}
@@ -319,59 +332,46 @@ return (
 };
 
 const styles = StyleSheet.create({
-
+  container: {
+    flex: 1,
+  },
+  contentWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  tabWrapper: {
+    position: 'absolute',
+    top: HEADER_HEIGHT - 1, // Overlap with header by 1px
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: '#FFFFFF',
     marginTop: 12,
     fontSize: 16,
   },
   errorText: {
-    color: '#FFFFFF',
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#2563eb',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
   }, 
-  
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  brandName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
   monthTabsContainer: {
-    maxHeight: 40,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    height: 40,
+    backgroundColor: '#000000',
   },
   monthTabsContent: {
     paddingHorizontal: 8,
@@ -380,21 +380,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  monthTabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#E4D0FF',
-  },
-  monthTabText: {
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  monthTabTextActive: {
-    color: '#FFFFFF',
-  },
   scrollContainer: {
     flex: 1,
     paddingHorizontal: 16,
+    // Add enough top padding to account for header and month tabs
+    marginTop: HEADER_HEIGHT + 40, 
   },
   scrollContentContainer: {
     paddingTop: 4,
@@ -403,12 +393,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
   },
   dateText: {
     width: 30,
-    color: '#FFFFFF',
     fontSize: 12,
   },
   boxesContainer: {
@@ -426,11 +413,8 @@ const styles = StyleSheet.create({
   },
   legend: {
     padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
   },
   legendTitle: {
-    color: '#FFFFFF',
     fontSize: 14,
     marginBottom: 8,
   },
@@ -450,7 +434,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendText: {
-    color: '#FFFFFF',
     fontSize: 12,
   },
 });

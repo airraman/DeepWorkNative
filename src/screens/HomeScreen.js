@@ -8,16 +8,23 @@ import {
   Dimensions,
   ScrollView,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Clock, Music, Pencil } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { deepWorkStore } from '../services/deepWorkStore';
+import { useTheme, THEMES } from '../context/ThemeContext';
+import SharedHeader from '../components/SharedHeader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HEADER_HEIGHT = Platform.OS === 'ios' ? 60 : 50;
+const CONTENT_PADDING_TOP = HEADER_HEIGHT - (Platform.OS === 'ios' ? 0 : 20);
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const { colors, theme } = useTheme();
+  const isDark = theme === THEMES.DARK;
   
   // Core state for session configuration
   const [duration, setDuration] = useState('');
@@ -38,8 +45,17 @@ const HomeScreen = () => {
 
   // Load settings when component first mounts
   useEffect(() => {
-    loadSettings();
+    checkFirstTimeUser();
   }, []);
+
+  const checkFirstTimeUser = async () => {
+    const settings = await deepWorkStore.getSettings();
+    if (!settings.activities.length || !settings.durations.length) {
+      navigation.replace('InitialSetup');
+    } else {
+      loadSettings();
+    }
+  };
 
   // Reload settings whenever the screen comes into focus
   // This ensures we have the latest settings after changes in SettingsScreen
@@ -88,69 +104,60 @@ const HomeScreen = () => {
     <TouchableOpacity
       style={[
         styles.activityItem,
+        { 
+          backgroundColor: isDark ? colors.card : 'white',
+          borderColor: activity === item.id ? colors.primary : colors.border 
+        },
         activity === item.id && styles.activityItemSelected
       ]}
       onPress={() => setActivity(item.id)}
     >
       <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-      <Text style={styles.activityName}>{item.name}</Text>
+      <Text style={[styles.activityName, { color: colors.text }]}>{item.name}</Text>
     </TouchableOpacity>
   );
 
   // Show loading screen while fetching settings
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={[
+        styles.container, 
+        styles.centered,
+        { backgroundColor: colors.background }
+      ]}>
+        <SharedHeader />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading settings...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-        <Text style={styles.brandName}>DeepWork.io</Text>
-        
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SharedHeader />
+      
+      <ScrollView 
+        style={[styles.content, { paddingTop: CONTENT_PADDING_TOP }]}
+        contentContainerStyle={styles.contentContainer}
+      >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Prepare Deep Work Session</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Prepare Deep Work Session</Text>
         </View>
-        <View style={styles.divider} />
-
-        {/* Duration Selection - Now using dynamic durations from settings */}
-        <View style={[styles.section, duration && styles.sectionCompleted]}>
-          <View style={styles.sectionHeader}>
-            <Clock stroke="#6b7280" size={20} />
-            <Text style={styles.sectionTitle}>Session Duration</Text>
-          </View>
-          <View style={styles.durationButtons}>
-            {availableDurations.map((time) => (
-              <TouchableOpacity
-                key={time}
-                style={[
-                  styles.durationButton,
-                  duration === time.toString() && styles.durationButtonActive
-                ]}
-                onPress={() => setDuration(time.toString())}
-              >
-                <Text
-                  style={[
-                    styles.durationButtonText,
-                    duration === time.toString() && styles.durationButtonTextActive
-                  ]}
-                >
-                  {time}m
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
+        
+        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+        
         {/* Activity Selection - Now using dynamic activities from settings */}
-        <View style={[styles.section, activity && styles.sectionCompleted]}>
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: activity ? colors.primary : colors.border 
+          },
+          activity && styles.sectionCompleted
+        ]}>
           <View style={styles.sectionHeader}>
-            <Pencil stroke="#6b7280" size={20} />
-            <Text style={styles.sectionTitle}>Activity Name</Text>
+            <Pencil stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Activity Name</Text>
           </View>
           <FlatList
             data={activities}
@@ -161,12 +168,57 @@ const HomeScreen = () => {
             style={styles.activitiesList}
           />
         </View>
+        
+        {/* Duration Selection - Now using dynamic durations from settings */}
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: duration ? colors.primary : colors.border 
+          },
+          duration && styles.sectionCompleted
+        ]}>
+          <View style={styles.sectionHeader}>
+            <Clock stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Duration</Text>
+          </View>
+          <View style={styles.durationButtons}>
+            {availableDurations.map((time) => (
+              <TouchableOpacity
+                key={time}
+                style={[
+                  styles.durationButton,
+                  { backgroundColor: isDark ? '#2a2a2a' : '#f3f4f6' },
+                  duration === time.toString() && { backgroundColor: colors.primary }
+                ]}
+                onPress={() => setDuration(time.toString())}
+              >
+                <Text
+                  style={[
+                    styles.durationButtonText,
+                    { color: isDark ? colors.textSecondary : '#1f2937' },
+                    duration === time.toString() && { color: 'white' }
+                  ]}
+                >
+                  {time}m
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Music Selection */}
-        <View style={[styles.section, musicChoice && styles.sectionCompleted]}>
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: musicChoice ? colors.primary : colors.border 
+          },
+          musicChoice && styles.sectionCompleted
+        ]}>
           <View style={styles.sectionHeader}>
-            <Music stroke="#6b7280" size={20} />
-            <Text style={styles.sectionTitle}>Background Music</Text>
+            <Music stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Background Music</Text>
           </View>
           <View style={styles.musicButtons}>
             {musicOptions.map((option) => (
@@ -174,14 +226,16 @@ const HomeScreen = () => {
                 key={option.value}
                 style={[
                   styles.musicButton,
-                  musicChoice === option.value && styles.musicButtonActive
+                  { backgroundColor: isDark ? '#2a2a2a' : '#f3f4f6' },
+                  musicChoice === option.value && { backgroundColor: colors.primary }
                 ]}
                 onPress={() => setMusicChoice(option.value)}
               >
                 <Text
                   style={[
                     styles.musicButtonText,
-                    musicChoice === option.value && styles.musicButtonTextActive
+                    { color: isDark ? colors.textSecondary : '#1f2937' },
+                    musicChoice === option.value && { color: 'white' }
                   ]}
                 >
                   {option.label}
@@ -190,18 +244,25 @@ const HomeScreen = () => {
             ))}
           </View>
         </View>
+        
+        {/* Extra padding at the bottom to ensure all content is visible above the footer */}
+        <View style={{ height: 80 }} />
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { 
+        backgroundColor: colors.card, 
+        borderTopColor: colors.border 
+      }]}>
         <TouchableOpacity
           style={[
             styles.startButton,
+            { backgroundColor: colors.primary },
             (!duration || !activity || !musicChoice) && styles.startButtonDisabled
           ]}
           onPress={handleStartSession}
           disabled={!duration || !activity || !musicChoice}
         >
-          <Text style={styles.startButtonText}>Begin Deep Work Timer</Text>
+          <Text style={[styles.startButtonText, { color: colors.buttonText }]}>Begin Deep Work Timer</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -211,42 +272,34 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    position: 'relative',
   },
+  // Content styles
   content: {
     flex: 1,
-    padding: 12,
+    paddingHorizontal: 12,
   },
-  brandName: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+  contentContainer: {
+    paddingBottom: 20,
   },
   header: {
-    marginTop: 40,
     alignItems: 'center',
+    marginBottom: 10,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
     textAlign: 'center',
   },
   divider: {
     height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 16,
+    marginBottom: 16,
   },
   section: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
   },
   sectionCompleted: {
     borderColor: '#2563eb',
@@ -260,7 +313,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
   },
   durationButtons: {
     flexDirection: 'row',
@@ -271,37 +323,26 @@ const styles = StyleSheet.create({
     width: (SCREEN_WIDTH - 96) / 3,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#f3f4f6',
     alignItems: 'center',
-  },
-  durationButtonActive: {
-    backgroundColor: '#2563eb',
   },
   durationButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
   },
-  durationButtonTextActive: {
-    color: 'white',
-  },
-  // New Activity Styles
+  // Activity Styles
   activitiesList: {
     flexGrow: 0,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     width: SCREEN_WIDTH * 0.6,
   },
   activityItemSelected: {
-    borderColor: '#2563eb',
     borderWidth: 2,
   },
   colorDot: {
@@ -313,9 +354,8 @@ const styles = StyleSheet.create({
   activityName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
   },
-  // Updated Music Styles
+  // Music Styles
   musicButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -325,30 +365,23 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#f3f4f6',
     alignItems: 'center',
-  },
-  musicButtonActive: {
-    backgroundColor: '#2563eb',
   },
   musicButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
     textAlign: 'center',
-  },
-  musicButtonTextActive: {
-    color: 'white',
   },
   // Footer Styles
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 16,
-    backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
   },
   startButton: {
-    backgroundColor: '#2563eb',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -357,9 +390,17 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   startButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Loading state
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
   },
 });
 

@@ -1,6 +1,7 @@
 // src/services/deepWorkStore.js
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SessionNotesModal from '../components/modals/SessionNotesModal';
 
 // Storage configuration
 const STORAGE_KEY = '@deep_work_sessions';
@@ -12,12 +13,9 @@ const DEBUG = true;
 // Default settings that will be used when initializing the app
 // or if settings become corrupted
 const DEFAULT_SETTINGS = {
-  activities: [
-    { id: 'write', name: 'Write', color: '#c8b2d6' },
-    { id: 'code', name: 'Code', color: '#f1dbbc' },
-    { id: 'produce-music', name: 'Produce Music', color: '#bcd2f1' }
-  ],
-  durations: [10, 20, 30], // Default duration options in minutes
+  activities: [], 
+  durations: [],
+  goals: [],    // Add this line
   lastUpdated: new Date().toISOString()
 };
 
@@ -69,6 +67,14 @@ const isValidSettings = (settings) => {
     settings.durations.every(duration => 
       typeof duration === 'number' && 
       duration > 0
+    ) &&
+    // Add goals validation
+    Array.isArray(settings.goals) &&
+    settings.goals.every(goal => 
+      goal.id &&
+      goal.name &&
+      goal.frequency &&
+      goal.hours
     )
   );
 };
@@ -80,38 +86,27 @@ export const deepWorkStore = {
    */
   initialize: async () => {
     try {
-      // Check if both storage systems exist
-      const [sessionsExist, settingsExist] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEY),
-        AsyncStorage.getItem(SETTINGS_KEY)
-      ]);
-      
-      // Initialize sessions storage if it doesn't exist
-      if (!sessionsExist) {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({}));
-        log('Sessions storage initialized');
-      }
-      
-      // Initialize settings storage if it doesn't exist
-      if (!settingsExist) {
-        await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
-        log('Settings storage initialized');
-      }
-
-      // Verify and repair storage if needed
-      const isValid = await deepWorkStore.verifyStorageIntegrity();
-      if (!isValid) {
-        log('Storage corruption detected, attempting repair');
-        await deepWorkStore.repairStorage();
-      }
-
-      log('Storage system initialized successfully');
-      return true;
+        // Check if storage exists first
+        const settings = await AsyncStorage.getItem(SETTINGS_KEY);
+        
+        // Only initialize if storage doesn't exist
+        if (!settings) {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+            await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                activities: [],
+                durations: [],
+                goals: [],
+                lastUpdated: new Date().toISOString()
+            }));
+            log('Storage initialized empty');
+        }
+        
+        return true;
     } catch (error) {
-      log('Initialization failed:', error);
-      return false;
+        console.error('Initialization failed:', error);
+        return false;
     }
-  },
+},
 
   /**
    * Get the current settings
@@ -226,6 +221,23 @@ getSessions: async () => {
       return false;
     }
   },
+
+  /**
+ * Update just the goals list
+ * @param {Array} goals - New goals array
+ */
+updateGoals: async (goals) => {
+  try {
+    const currentSettings = await deepWorkStore.getSettings();
+    return await deepWorkStore.updateSettings({
+      ...currentSettings,
+      goals
+    });
+  } catch (error) {
+    log('Error updating goals:', error);
+    return false;
+  }
+},
 
   /**
    * Add a new completed session to storage
@@ -460,5 +472,7 @@ getSessions: async () => {
       return false;
     }
   }
+
+
 };
 

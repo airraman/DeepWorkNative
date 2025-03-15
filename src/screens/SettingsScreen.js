@@ -2,19 +2,30 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,  // This was missing
+  StyleSheet,
   TouchableOpacity,
   TextInput,
   ScrollView,
   FlatList,
   SafeAreaView,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform,
+  Dimensions
 } from 'react-native';
-import { Plus, X, Save } from 'lucide-react-native';
+import { Plus, X, Save, Clock, Pencil } from 'lucide-react-native';
 import { deepWorkStore } from '../services/deepWorkStore';
+import SharedHeader from '../components/SharedHeader';
+import { useTheme, THEMES } from '../context/ThemeContext';
+
+// Use the same header height as other screens
+const HEADER_HEIGHT = Platform.OS === 'ios' ? 60 : 50;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const SettingsScreen = () => {
+  const { colors, theme } = useTheme();
+  const isDark = theme === THEMES.DARK;
+  
   // Core state management
   const [activities, setActivities] = useState([]);
   const [newActivity, setNewActivity] = useState('');
@@ -173,16 +184,24 @@ const SettingsScreen = () => {
   };
 
   const renderActivity = ({ item }) => (
-    <View style={styles.activityItem}>
+    <View style={[
+      styles.activityItem, 
+      { 
+        backgroundColor: isDark ? colors.card : 'white',
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 8,
+      }
+    ]}>
       <View style={styles.activityInfo}>
         <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-        <Text style={styles.activityName}>{item.name}</Text>
+        <Text style={[styles.activityName, { color: colors.text }]}>{item.name}</Text>
         <TouchableOpacity
           onPress={() => handleDeleteActivity(item.id)}
           style={styles.deleteButton}
           disabled={isSaving}
         >
-          <X size={16} color="#6b7280" />
+          <X size={16} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -190,37 +209,67 @@ const SettingsScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Loading settings...</Text>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <SharedHeader title="Settings" />
+        <View style={[styles.centered, { marginTop: HEADER_HEIGHT }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading settings...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SharedHeader title="Settings" />
+      
+      <ScrollView 
+        style={[styles.scrollView]}
+        contentContainerStyle={{ paddingTop: HEADER_HEIGHT, paddingHorizontal: 12 }}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Configure Your App</Text>
         </View>
-
+        
+        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+        
         {/* Add Activity Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add Activity</Text>
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            borderRadius: 12, 
+            borderWidth: 2 
+          }
+        ]}>
+          <View style={styles.sectionHeader}>
+            <Plus stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Add Activity</Text>
+          </View>
+          
           <View style={styles.addActivityForm}>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { 
+                  borderColor: colors.border, 
+                  backgroundColor: isDark ? '#2a2a2a' : '#f3f4f6',
+                  color: colors.text
+                }
+              ]}
               value={newActivity}
               onChangeText={setNewActivity}
               placeholder="Activity name"
+              placeholderTextColor={colors.textSecondary}
               maxLength={20}
               editable={!isSaving}
             />
             <View style={styles.formControls}>
               <View style={styles.colorSelectContainer}>
-                <Text style={styles.colorSelectLabel}>Color:</Text>
+                <Text style={[styles.colorSelectLabel, { color: colors.textSecondary }]}>Color:</Text>
                 <TouchableOpacity
-                  style={[styles.selectedColorPreview, { backgroundColor: selectedColor }]}
+                  style={[styles.selectedColorPreview, { backgroundColor: selectedColor, borderColor: colors.border }]}
                   onPress={() => setShowColorPicker(true)}
                   disabled={isSaving}
                 />
@@ -228,6 +277,7 @@ const SettingsScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.addButton,
+                  { backgroundColor: colors.primary },
                   (!newActivity.trim() || isSaving) && styles.disabledButton
                 ]}
                 onPress={handleAddActivity}
@@ -247,8 +297,20 @@ const SettingsScreen = () => {
         </View>
 
         {/* Activities List */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Activities</Text>
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            borderRadius: 12, 
+            borderWidth: 2
+          }
+        ]}>
+          <View style={styles.sectionHeader}>
+            <Pencil stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Activities</Text>
+          </View>
+          
           <FlatList
             data={activities}
             renderItem={renderActivity}
@@ -260,22 +322,35 @@ const SettingsScreen = () => {
         </View>
 
         {/* Duration Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Session Lengths</Text>
-          <Text style={styles.helpText}>
+        <View style={[
+          styles.section, 
+          { 
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            borderRadius: 12, 
+            borderWidth: 2
+          }
+        ]}>
+          <View style={styles.sectionHeader}>
+            <Clock stroke={colors.textSecondary} size={20} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Lengths</Text>
+          </View>
+          
+          <Text style={[styles.helpText, { color: colors.textSecondary }]}>
             Select 3 options ({selectedDurations.length}/3)
           </Text>
-          <View style={styles.durationGrid}>
+          
+          <View style={styles.durationButtons}>
             {durations.map((duration) => (
               <TouchableOpacity
                 key={duration}
                 style={[
                   styles.durationButton,
-                  selectedDurations.includes(duration) && styles.selectedDuration,
+                  { backgroundColor: isDark ? '#2a2a2a' : '#f3f4f6' },
+                  selectedDurations.includes(duration) && { backgroundColor: colors.primary },
                   selectedDurations.length === 3 &&
                     !selectedDurations.includes(duration) &&
-                    styles.disabledDuration,
-                  isSaving && styles.disabledButton
+                    styles.disabledDuration
                 ]}
                 onPress={() => handleDurationClick(duration)}
                 disabled={
@@ -286,9 +361,9 @@ const SettingsScreen = () => {
               >
                 <Text
                   style={[
-                    styles.durationText,
-                    selectedDurations.includes(duration) &&
-                      styles.selectedDurationText,
+                    styles.durationButtonText,
+                    { color: isDark ? colors.textSecondary : '#1f2937' },
+                    selectedDurations.includes(duration) && { color: 'white' }
                   ]}
                 >
                   {duration}m
@@ -302,6 +377,7 @@ const SettingsScreen = () => {
         <TouchableOpacity
           style={[
             styles.updateButton,
+            { backgroundColor: colors.primary },
             (selectedDurations.length !== 3 || isSaving) && styles.disabledButton,
           ]}
           onPress={handleSaveSettings}
@@ -310,114 +386,107 @@ const SettingsScreen = () => {
           {isSaving ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
-            <>
-              <Save size={20} color="white" />
-              <Text style={styles.buttonText}>Update Settings</Text>
-            </>
+            <Text style={styles.updateButtonText}>Save Settings</Text>
           )}
         </TouchableOpacity>
 
-        {/* Color Picker Modal */}
-        <Modal
-          visible={showColorPicker}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowColorPicker(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowColorPicker(false)}
-          >
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Select Color</Text>
-              <View style={styles.colorGrid}>
-                {colorPalette.map(color => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[styles.colorOption, { backgroundColor: color }]}
-                    onPress={() => {
-                      setSelectedColor(color);
-                      setShowColorPicker(false);
-                    }}
-                  />
-                ))}
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Alert */}
-        {showAlert && (
-          <View style={styles.alert}>
-            <Text style={styles.alertText}>{alertMessage}</Text>
-          </View>
-        )}
+        {/* Extra padding at the bottom for better scrolling experience */}
+        <View style={{ height: 80 }} />
       </ScrollView>
+
+      {/* Color Picker Modal */}
+      <Modal
+        visible={showColorPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowColorPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowColorPicker(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Select Color</Text>
+            <View style={styles.colorGrid}>
+              {colorPalette.map(color => (
+                <TouchableOpacity
+                  key={color}
+                  style={[styles.colorOption, { backgroundColor: color, borderColor: colors.border }]}
+                  onPress={() => {
+                    setSelectedColor(color);
+                    setShowColorPicker(false);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Alert */}
+      {showAlert && (
+        <View style={[styles.alert, { backgroundColor: colors.background === '#000000' ? '#1f2937' : '#1f2937' }]}>
+          <Text style={styles.alertText}>{alertMessage}</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  // Core container styles that provide the basic layout structure
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    position: 'relative',
   },
   scrollView: {
     flex: 1,
   },
-
-  // Loading state styles for the centered loading indicator
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6b7280',
   },
-
-  // Header section styles
   header: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: 'white',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
+    textAlign: 'center',
   },
-
-  // Common section styles used throughout the screen
+  divider: {
+    height: 1,
+    marginBottom: 16,
+  },
   section: {
-    padding: 15,
-    backgroundColor: 'white',
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 15,
-    color: '#1f2937',
   },
-
-  // Add Activity form styles
   addActivityForm: {
     width: '100%',
   },
   input: {
     height: 44,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     paddingHorizontal: 15,
     marginBottom: 10,
-    backgroundColor: 'white',
-    textAlign: 'center',
     fontSize: 16,
   },
   formControls: {
@@ -425,8 +494,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
-  // Color selection styles
   colorSelectContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,21 +501,16 @@ const styles = StyleSheet.create({
   },
   colorSelectLabel: {
     fontSize: 14,
-    color: '#6b7280',
   },
   selectedColorPreview: {
     width: 30,
     height: 30,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
-
-  // Button styles used throughout the screen
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 8,
@@ -461,86 +523,68 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
   },
-
-  // Activity list styles
   activitiesList: {
     flexGrow: 0,
   },
   activityItem: {
-    backgroundColor: 'white',
-    borderRadius: 8,
     padding: 12,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    width: 200,
+    marginRight: 8,
+    width: SCREEN_WIDTH * 0.6,
   },
   activityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   colorDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 8,
   },
   activityName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
     flex: 1,
   },
   deleteButton: {
     padding: 4,
   },
-
-  // Duration selection styles
   helpText: {
     fontSize: 14,
-    color: '#6b7280',
     marginBottom: 10,
+    textAlign: 'center',
   },
-  durationGrid: {
+  durationButtons: {
     flexDirection: 'row',
+    justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 8,
-    justifyContent: 'space-between',
   },
   durationButton: {
-    width: '48%',
-    backgroundColor: '#f3f4f6',
+    width: (SCREEN_WIDTH - 96) / 3,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
-  selectedDuration: {
-    backgroundColor: '#2563eb',
-  },
-  durationText: {
-    color: '#1f2937',
+  durationButtonText: {
+    fontSize: 14,
     fontWeight: '500',
-  },
-  selectedDurationText: {
-    color: 'white',
   },
   disabledDuration: {
     opacity: 0.5,
   },
-
-  // Update button styles
   updateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2563eb',
-    padding: 15,
+    padding: 16,
     borderRadius: 8,
-    margin: 15,
-    gap: 8,
+    alignItems: 'center',
+    marginVertical: 16,
+    marginHorizontal: 4,
   },
-
-  // Modal styles for color picker
+  updateButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -548,7 +592,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     width: '80%',
@@ -558,7 +601,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 15,
-    color: '#1f2937',
     textAlign: 'center',
   },
   colorGrid: {
@@ -572,16 +614,12 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
-
-  // Alert styles for feedback messages
   alert: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: '#1f2937',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
