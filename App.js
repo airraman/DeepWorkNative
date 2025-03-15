@@ -1,9 +1,11 @@
 // App.js
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ThemeProvider } from './src/context/ThemeContext';
+import * as Notifications from 'expo-notifications';
+import { navigationRef } from './src/services/navigationService'; // You'll need to create this
 
 // Import screens
 import InitialSetupScreen from './src/screens/InitialSetUpScreen';
@@ -29,11 +31,48 @@ function TabNavigator() {
   );
 }
 
+
+
 // Main App component using both navigators
 function App() {
+
+  useEffect(() => {
+    // Set up response handler
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const actionId = response.actionIdentifier;
+      
+      if (actionId === 'PAUSE_RESUME') {
+        // Get the active session and toggle pause state
+        const handlePauseResume = async () => {
+          const sessionData = await getActiveSessionFromStorage();
+          if (sessionData) {
+            await backgroundTimer.updateTimerPauseState(!sessionData.isPaused);
+          }
+        };
+        handlePauseResume();
+      } 
+      else if (actionId === 'END_SESSION') {
+        // End the session
+        backgroundTimer.stopTimerNotification();
+        if (navigationRef.current) {
+          navigationRef.current.navigate('MainApp', { screen: 'Home' });
+        }
+      }
+      else if (response.notification.request.content.data.screen) {
+        // Navigate to the session screen if notification was tapped
+        const screen = response.notification.request.content.data.screen;
+        if (navigationRef.current) {
+          navigationRef.current.navigate(screen);
+        }
+      }
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
   return (
     <ThemeProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName="InitialSetup"
           screenOptions={{

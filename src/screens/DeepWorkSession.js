@@ -15,6 +15,7 @@ import {
 import { deepWorkStore } from '../services/deepWorkStore';
 import SessionNotesModal from '../components/modals/SessionNotesModal';
 import { Pause, Play, ChevronLeft } from 'lucide-react-native';
+import backgroundTimer from '../services/backgroundTimer';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -110,6 +111,25 @@ const DeepWorkSession = ({ route, navigation }) => {
     loadActivityDetails();
   }, [activity]);
 
+  // Initialize background timer
+  useEffect(() => {
+    // Start background timer when session begins
+    const initBackgroundTimer = async () => {
+      await backgroundTimer.startTimerNotification(
+        parseInt(duration),
+        activity,
+        musicChoice
+      );
+    };
+    
+    initBackgroundTimer();
+    
+    // Clean up when component unmounts
+    return () => {
+      backgroundTimer.stopTimerNotification();
+    };
+  }, [duration, activity, musicChoice]);
+
   // Function to confirm ending the session
   const confirmEndSession = () => {
     Alert.alert(
@@ -128,7 +148,10 @@ const DeepWorkSession = ({ route, navigation }) => {
         },
         {
           text: 'End Session',
-          onPress: () => navigation.navigate('MainApp', { screen: 'Home' }),
+          onPress: async () => {
+            await backgroundTimer.stopTimerNotification();
+            navigation.navigate('MainApp', { screen: 'Home' });
+          },
           style: 'destructive',
         },
       ]
@@ -150,9 +173,15 @@ const DeepWorkSession = ({ route, navigation }) => {
         duration: timeLeft,
         useNativeDriver: false,
       }).start();
+      
+      // Update background timer pause state
+      backgroundTimer.updateTimerPauseState(false);
     } else {
       // Pause the animation
       animatedHeight.stopAnimation();
+      
+      // Update background timer pause state
+      backgroundTimer.updateTimerPauseState(true);
     }
 
     setIsPaused(!isPaused);
@@ -207,6 +236,9 @@ const DeepWorkSession = ({ route, navigation }) => {
 
     try {
       setIsSaving(true);
+      
+      // Stop background timer
+      await backgroundTimer.stopTimerNotification();
 
       const storageOk = await deepWorkStore.verifyStorageIntegrity();
       if (!storageOk) {
@@ -281,7 +313,10 @@ const DeepWorkSession = ({ route, navigation }) => {
             {
               text: 'End Without Saving',
               style: 'destructive',
-              onPress: () => navigation.navigate('MainApp', { screen: 'Home' }),
+              onPress: async () => {
+                await backgroundTimer.stopTimerNotification();
+                navigation.navigate('MainApp', { screen: 'Home' });
+              },
             },
           ]
         );
@@ -302,7 +337,7 @@ const DeepWorkSession = ({ route, navigation }) => {
     );
 
     return () => backHandler.remove();
-  }, [navigation]);
+  }, []);
 
   // Initialize timer and animation
   useEffect(() => {
